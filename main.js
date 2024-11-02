@@ -1,8 +1,19 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('button').addEventListener('click', () => {
+        document.getElementById('button').style.display = 'none';
+        document.getElementById('speedModifier').style.display = 'flex';
+        document.getElementById('introScreen').style.display = 'none';
+        document.getElementById('toggleOrbits').style.display = 'block';
+        initializeSolarSystem();
+    });
+});
+
 // Constant
-let speedMultiplier = 0;
+let speedMultiplier = 0.1;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000011);
@@ -24,6 +35,29 @@ document.body.appendChild(renderer.domElement);
 
 const textureLoader = new THREE.TextureLoader();
 
+// Create stars in the background
+function addStars() {
+    const starGeometry = new THREE.BufferGeometry();
+    const starMaterial = new THREE.PointsMaterial({ color: 0xffffff });
+
+    const starCount = 10000;
+    const starVertices = [];
+
+    for (let i = 0; i < starCount; i++) {
+        const x = THREE.MathUtils.randFloatSpread(2000);
+        const y = THREE.MathUtils.randFloatSpread(2000);
+        const z = THREE.MathUtils.randFloatSpread(2000);
+        starVertices.push(x, y, z);
+    }
+
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+}
+
+addStars(); // Call the function to add stars
+renderer.render(scene, camera);
+
 // Load textures for the planets
 const sunTexture = textureLoader.load('textures/sun.jpg');
 const mercuryTexture = textureLoader.load('textures/mercury.jpg');
@@ -34,6 +68,7 @@ const jupiterTexture = textureLoader.load('textures/jupiter.jpg');
 const saturnTexture = textureLoader.load('textures/saturn.jpg');
 const uranusTexture = textureLoader.load('textures/uranus.jpg');
 const neptuneTexture = textureLoader.load('textures/neptune.jpg');
+const plutoTexture = textureLoader.load('textures/pluto.jpg');
 const asteroidTexture = textureLoader.load('textures/asteroid.jpg');
 
 const sizeMultiplier = 0.1;
@@ -53,6 +88,8 @@ const planetData = [
     { name: 'SATURN', size: 1, distance: 9.54, texture: saturnTexture, speed: 0.0009294, rotationSpeed: 0.03, initialAngleDeg: 303.73 },
     { name: 'URANUS', size: 0.9, distance: 19.2, texture: uranusTexture, speed: 0.0002370, rotationSpeed: 0.02, initialAngleDeg: 106.45 },
     { name: 'NEPTUNE', size: 0.85, distance: 30.06, texture: neptuneTexture, speed: 0.0001208, rotationSpeed: 0.02, initialAngleDeg: 54.3 },
+    { name: 'PLUTO', size: 0.4, distance: 39.48, texture: plutoTexture, speed: 0.0000806, rotationSpeed: 0.01, initialAngleDeg: 0 },
+    
 ];
 
 // Arrays to hold planet meshes and orbits
@@ -97,7 +134,10 @@ planetData.forEach(data => {
 
 // Create the asteroid belt
 const asteroidBelt = new THREE.Group();
+const kuiperBelt = new THREE.Group(); 
 scene.add(asteroidBelt);
+scene.add(kuiperBelt); 
+
 
 function createAsteroidBelt() {
     const asteroidCount = 1500; // Number of asteroids
@@ -135,27 +175,73 @@ function createAsteroidBelt() {
 
 createAsteroidBelt(); // Generate the asteroid belt
 
-// Create stars in the background
-function addStars() {
-    const starGeometry = new THREE.BufferGeometry();
-    const starMaterial = new THREE.PointsMaterial({ color: 0xffffff });
+function createKuiperBelt() {
+    const kuiperBeltCount = 1000; // Adjust the number for performance
+    const beltInnerRadius = 45; // Just beyond Neptune's orbit (30 AU)
+    const beltOuterRadius = 50; // Up to 50 AU from the Sun
 
-    const starCount = 10000;
-    const starVertices = [];
+    const kuiperBeltMaterial = new THREE.MeshBasicMaterial({ map: asteroidTexture, color: 0x666666 });
 
-    for (let i = 0; i < starCount; i++) {
-        const x = THREE.MathUtils.randFloatSpread(2000);
-        const y = THREE.MathUtils.randFloatSpread(2000);
-        const z = THREE.MathUtils.randFloatSpread(2000);
-        starVertices.push(x, y, z);
+    for (let i = 0; i < kuiperBeltCount; i++) {
+        const kuiperObjectGeometry = new THREE.SphereGeometry(THREE.MathUtils.randFloat(1,3) * sizeMultiplier, 8, 8);
+        const kuiperObject = new THREE.Mesh(kuiperObjectGeometry, kuiperBeltMaterial);
+
+        // Random distance within the belt
+        const distance = THREE.MathUtils.randFloat(beltInnerRadius, beltOuterRadius);
+
+        // Random angle around the sun
+        const angle = THREE.MathUtils.randFloat(0, Math.PI * 2);
+
+        // Random height to give thickness to the belt
+        const height = THREE.MathUtils.randFloatSpread(2); // Slight vertical spread
+
+        kuiperObject.position.set(
+            Math.cos(angle) * distance,
+            height,
+            Math.sin(angle) * distance
+        );
+
+        // Random speed for Kuiper Belt object's orbit (slower than inner asteroids)
+        const speed = THREE.MathUtils.randFloat(0.00005, 0.00015);
+
+        kuiperObject.userData = { distance, angle, speed };
+
+        kuiperBelt.add(kuiperObject);
     }
-
-    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-    const stars = new THREE.Points(starGeometry, starMaterial);
-    scene.add(stars);
 }
 
-addStars(); // Call the function to add stars
+
+createKuiperBelt();
+
+function createOortCloud() {
+    const particleCount = 10000; // Adjust for performance
+    const innerRadius = 200; // Just beyond Pluto
+    const outerRadius = 300; // Scale as needed
+
+    const positions = [];
+
+    for (let i = 0; i < particleCount; i++) {
+        const radius = THREE.MathUtils.randFloat(innerRadius, outerRadius);
+        const theta = THREE.MathUtils.randFloat(0, Math.PI * 2);
+        const phi = Math.acos(THREE.MathUtils.randFloat(-1, 1));
+
+        const x = radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.sin(phi) * Math.sin(theta);
+        const z = radius * Math.cos(phi);
+
+        positions.push(x, y, z);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05 });
+
+    const oortCloud = new THREE.Points(geometry, material);
+    scene.add(oortCloud);
+}
+
+createOortCloud();
 
 // Camera controls
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -165,8 +251,30 @@ controls.enableZoom = true;
 controls.enableRotate = true;
 controls.enablePan = false;
 
+let simulationStartDate = new Date('November 2, 2024');
+let simulationCurrentDate = new Date(simulationStartDate);
+let lastFrameTime = performance.now();
+
 function animate() {
     requestAnimationFrame(animate);
+
+    // Calculate time elapsed since the last frame
+    const currentFrameTime = performance.now();
+    const deltaTime = currentFrameTime - lastFrameTime; // in milliseconds
+    lastFrameTime = currentFrameTime;
+
+    // Update simulation time
+    // At speedMultiplier = 1, simulation advances 1 day per real second
+    const millisecondsPerDay = 13000000000; // Number of milliseconds in a day
+    const simulationMillisecondsPerRealMillisecond = speedMultiplier * millisecondsPerDay / 1000; // ms/ms
+
+    const simulationTimeElapsed = deltaTime * simulationMillisecondsPerRealMillisecond; // in milliseconds
+
+    // Update the simulation date
+    simulationCurrentDate.setTime(simulationCurrentDate.getTime() + simulationTimeElapsed);
+
+    // Update the date display
+    dateDiv.textContent = simulationCurrentDate.toLocaleString();
 
     // Rotate planets
     planets.forEach(p => {
@@ -186,6 +294,16 @@ function animate() {
             Math.cos(asteroid.userData.angle) * asteroid.userData.distance,
             asteroid.position.y, // Keep the original height
             Math.sin(asteroid.userData.angle) * asteroid.userData.distance
+        );
+    });
+
+    // Update Kuiper Belt
+    kuiperBelt.children.forEach(object => {
+        object.userData.angle += object.userData.speed * speedMultiplier;
+        object.position.set(
+            Math.cos(object.userData.angle) * object.userData.distance,
+            object.position.y, // Keep the original height
+            Math.sin(object.userData.angle) * object.userData.distance
         );
     });
 
@@ -216,8 +334,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate();
-
 // Event listener to toggle orbit visibility
 document.getElementById('toggleOrbits').addEventListener('click', () => {
     orbits.forEach(orbit => {
@@ -225,13 +341,6 @@ document.getElementById('toggleOrbits').addEventListener('click', () => {
     });
 });
 
-// Get references to the slider and the speed display
-const speedSlider = document.getElementById('speedSlider');
-const speedValue = document.getElementById('speedValue');
-speedSlider.addEventListener('input', () => {
-    speedMultiplier = parseFloat(speedSlider.value);
-    speedValue.textContent = speedMultiplier.toFixed(1) + 'x';
-});
 
 // Adjust camera and renderer on window resize
 window.addEventListener('resize', () => {
@@ -249,7 +358,7 @@ window.addEventListener('resize', () => {
 // Create and style the date label
 const dateDiv = document.createElement('div');
 dateDiv.className = 'date-label';
-dateDiv.textContent = 'November 2, 2024';
+dateDiv.textContent = simulationStartDate.toDateString();
 
 // Style the date label
 dateDiv.style.position = 'absolute';
@@ -262,3 +371,54 @@ dateDiv.style.color = 'white';
 dateDiv.style.pointerEvents = 'none';
 
 document.body.appendChild(dateDiv);
+
+document.getElementById('super-prev').addEventListener('click', () => {speedMultiplier = -5});
+document.getElementById('prev').addEventListener('click', () => {speedMultiplier = -2});
+document.getElementById('pause-play').addEventListener('click', () => {
+    if (speedMultiplier == 0) {
+        speedMultiplier = 0.1;
+    }
+    else {
+        speedMultiplier = 0;
+    }
+});
+document.getElementById('fast-forward').addEventListener('click', () => {speedMultiplier = 2});
+document.getElementById('super-fast').addEventListener('click', () => {speedMultiplier = 5});
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function zoomAnimate() {
+    for (let i = 500; i >= 2; i-= 7) {
+        camera.position.set(i, i, i);
+        await sleep(3);
+        if (i < 10) {
+            i += 6.9;
+        }
+        else if (i < 60) {
+            i += 6.75;
+        }
+        else if (i < 80) {
+            i += 6.4
+        }
+        else if (i < 100) {
+            i += 6;
+        }
+        else if (i < 200) {
+            i += 5;
+        }
+        else if (i < 300) {
+            i += 4;
+        }
+        else if (i < 400) {
+            i += 3;
+        }
+    }
+}
+
+function initializeSolarSystem() {
+    lastFrameTime = performance.now();
+    zoomAnimate();
+    animate();
+}
