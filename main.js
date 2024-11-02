@@ -2,11 +2,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 // Constant
-let speedMultiplier = 0.1;
+let speedMultiplier = 0;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000011);
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
 camera.position.y = 2;
 
 // Create renderer
@@ -29,6 +34,7 @@ const jupiterTexture = textureLoader.load('textures/jupiter.jpg');
 const saturnTexture = textureLoader.load('textures/saturn.jpg');
 const uranusTexture = textureLoader.load('textures/uranus.jpg');
 const neptuneTexture = textureLoader.load('textures/neptune.jpg');
+const asteroidTexture = textureLoader.load('textures/asteroid.jpg');
 
 const sizeMultiplier = 0.1;
 // Create a big ball for the sun
@@ -39,14 +45,14 @@ scene.add(sun);
 
 // Planet data (size, distance from sun, speed of orbit)
 const planetData = [
-    { name: 'MERCURY', size: 0.5, distance: 0.39, texture: mercuryTexture, speed: 0.08264, rotationSpeed: 0.02 },
-    { name: 'VENUS', size: 0.7, distance: 0.72, texture: venusTexture, speed: 0.03232, rotationSpeed: 0.01 },
-    { name: 'EARTH', size: 0.75, distance: 1, texture: earthTexture, speed: 0.01992, rotationSpeed: 0.03 },
-    { name: 'MARS', size: 0.6, distance: 1.52, texture: marsTexture, speed: 0.01059, rotationSpeed: 0.04 },
-    { name: 'JUPITER', size: 1.2, distance: 5.2, texture: jupiterTexture, speed: 0.001673, rotationSpeed: 0.05 },
-    { name: 'SATURN', size: 1, distance: 9.54, texture: saturnTexture, speed: 0.0009294, rotationSpeed: 0.03 },
-    { name: 'URANUS', size: 0.9, distance: 19.2, texture: uranusTexture, speed: 0.0002370, rotationSpeed: 0.02 },
-    { name: 'NEPTUNE', size: 0.85, distance: 30.06, texture: neptuneTexture, speed: 0.0001208, rotationSpeed: 0.02 },
+    { name: 'MERCURY', size: 0.5, distance: 0.39, texture: mercuryTexture, speed: 0.08264, rotationSpeed: 0.02, initialAngleDeg: 51.57 },
+    { name: 'VENUS', size: 0.7, distance: 0.72, texture: venusTexture, speed: 0.03232, rotationSpeed: 0.01, initialAngleDeg: 142.2 },
+    { name: 'EARTH', size: 0.75, distance: 1, texture: earthTexture, speed: 0.01992, rotationSpeed: 0.03, initialAngleDeg: 303.84 },
+    { name: 'MARS', size: 0.6, distance: 1.52, texture: marsTexture, speed: 0.01059, rotationSpeed: 0.04, initialAngleDeg: 78.12 },
+    { name: 'JUPITER', size: 1.2, distance: 5.2, texture: jupiterTexture, speed: 0.001673, rotationSpeed: 0.05, initialAngleDeg: 33.84 },
+    { name: 'SATURN', size: 1, distance: 9.54, texture: saturnTexture, speed: 0.0009294, rotationSpeed: 0.03, initialAngleDeg: 303.73 },
+    { name: 'URANUS', size: 0.9, distance: 19.2, texture: uranusTexture, speed: 0.0002370, rotationSpeed: 0.02, initialAngleDeg: 106.45 },
+    { name: 'NEPTUNE', size: 0.85, distance: 30.06, texture: neptuneTexture, speed: 0.0001208, rotationSpeed: 0.02, initialAngleDeg: 54.3 },
 ];
 
 // Arrays to hold planet meshes and orbits
@@ -62,7 +68,11 @@ planetData.forEach(data => {
     const planet = new THREE.Mesh(geometry, planetMaterial);
     planet.position.set(data.distance, 0, 0);
     scene.add(planet);
-    planets.push({ planet, distance: data.distance, speed: data.speed, angle: 0, rotationSpeed: data.rotationSpeed });
+    
+    // Compute initial angle in radians
+    const initialAngleRad = (data.initialAngleDeg * Math.PI) / 180;
+
+    planets.push({ planet, distance: data.distance, speed: data.speed, angle: initialAngleRad, rotationSpeed: data.rotationSpeed });
 
     // Create the label as an HTML div
     const labelDiv = document.createElement('div');
@@ -84,6 +94,46 @@ planetData.forEach(data => {
     scene.add(orbit);
     orbits.push(orbit);
 });
+
+// Create the asteroid belt
+const asteroidBelt = new THREE.Group();
+scene.add(asteroidBelt);
+
+function createAsteroidBelt() {
+    const asteroidCount = 1500; // Number of asteroids
+    const beltInnerRadius = 2.0; // Just beyond Mars' orbit
+    const beltOuterRadius = 3.2; // Just before Jupiter's orbit
+    const asteroidMaterial = new THREE.MeshBasicMaterial({ map: asteroidTexture, color: 0x656565 });
+
+    for (let i = 0; i < asteroidCount; i++) {
+        const asteroidGeometry = new THREE.SphereGeometry(THREE.MathUtils.randFloat(0, 0.3) * sizeMultiplier, 8, 8); // Small spheres
+        const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+
+        // Random distance within the belt
+        const distance = THREE.MathUtils.randFloat(beltInnerRadius, beltOuterRadius);
+
+        // Random angle around the sun
+        const angle = THREE.MathUtils.randFloat(0, Math.PI * 2);
+
+        // Random height to give thickness to the belt
+        const height = THREE.MathUtils.randFloatSpread(0.1); // Slight vertical spread
+
+        asteroid.position.set(
+            Math.cos(angle) * distance,
+            height,
+            Math.sin(angle) * distance
+        );
+
+        // Random speed for asteroid orbit
+        const speed = THREE.MathUtils.randFloat(0.0005, 0.001);
+
+        asteroid.userData = { distance, angle, speed };
+
+        asteroidBelt.add(asteroid);
+    }
+}
+
+createAsteroidBelt(); // Generate the asteroid belt
 
 // Create stars in the background
 function addStars() {
@@ -126,7 +176,17 @@ function animate() {
             0,
             Math.sin(p.angle) * p.distance
         );
-        p.planet.rotation.y += p.rotationSpeed;
+        p.planet.rotation.y += p.rotationSpeed * speedMultiplier;
+    });
+
+    // Update asteroid belt
+    asteroidBelt.children.forEach(asteroid => {
+        asteroid.userData.angle += asteroid.userData.speed * speedMultiplier;
+        asteroid.position.set(
+            Math.cos(asteroid.userData.angle) * asteroid.userData.distance,
+            asteroid.position.y, // Keep the original height
+            Math.sin(asteroid.userData.angle) * asteroid.userData.distance
+        );
     });
 
     // Update labels' positions
@@ -149,7 +209,7 @@ function animate() {
     });
 
     // Rotate the sun
-    sun.rotation.y += 0.002;
+    sun.rotation.y += 0.002 * speedMultiplier;
 
     controls.update();
 
@@ -185,3 +245,20 @@ window.addEventListener('resize', () => {
         l.labelDiv.style.top = '';
     });
 });
+
+// Create and style the date label
+const dateDiv = document.createElement('div');
+dateDiv.className = 'date-label';
+dateDiv.textContent = 'November 2, 2024';
+
+// Style the date label
+dateDiv.style.position = 'absolute';
+dateDiv.style.top = '10px';
+dateDiv.style.width = '100%';
+dateDiv.style.textAlign = 'center';
+dateDiv.style.fontWeight = 'bold';
+dateDiv.style.fontSize = '20px';
+dateDiv.style.color = 'white';
+dateDiv.style.pointerEvents = 'none';
+
+document.body.appendChild(dateDiv);
